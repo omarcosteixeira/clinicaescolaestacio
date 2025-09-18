@@ -243,6 +243,7 @@
         const mainSystem = document.getElementById('main-system');
         let unsubscribeAppointments = null;
         let unsubscribeUsers = null;
+        let userEmails = {};
 
         // Elementos do DOM - Autenticação
         const authTitle = document.getElementById('auth-title');
@@ -283,6 +284,7 @@
                         // O onSnapshot do perfil de usuário garante que a função será carregada
                         // assim que o documento estiver disponível, evitando erros.
                         setupUserRoleListener();
+                        setupUsersListener(); // Inicia a escuta de todos os usuários
                     } else {
                         // Ninguém logado, mostra a tela de autenticação
                         authScreen.classList.remove('hidden');
@@ -389,7 +391,6 @@
             if (role === 'admin') {
                 scheduleSection.classList.remove('hidden');
                 adminSection.classList.remove('hidden');
-                setupUsersListener();
             } else {
                 scheduleSection.classList.add('hidden');
                 adminSection.classList.add('hidden');
@@ -404,14 +405,18 @@
         // --- Gerenciamento de Usuários (Admin) ---
 
         function setupUsersListener() {
-            if (!db || userRole !== 'admin') return;
+            if (!db) return;
             const usersRef = collection(db, "user_roles");
             unsubscribeUsers = onSnapshot(usersRef, (querySnapshot) => {
                 allUsers = [];
+                userEmails = {};
                 querySnapshot.forEach((doc) => {
                     allUsers.push({ id: doc.id, ...doc.data() });
+                    userEmails[doc.id] = doc.data().email;
                 });
-                renderUsers();
+                if (userRole === 'admin') {
+                    renderUsers();
+                }
             }, (error) => {
                 console.error("Erro ao obter usuários em tempo real:", error);
             });
@@ -458,9 +463,9 @@
         // --- Funcionalidades da Agenda ---
 
         function setupAppointmentsListener() {
-            if (!db || !userId) return;
+            if (!db) return;
 
-            const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
+            const appointmentsRef = collection(db, `artifacts/${appId}/public/data/appointments`);
             const q = query(appointmentsRef);
 
             unsubscribeAppointments = onSnapshot(q, (querySnapshot) => {
@@ -485,10 +490,10 @@
         }
 
         async function saveAppointment(appointment) {
-            if (!db || !userId) return;
+            if (!db) return;
             try {
-                const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
-                await addDoc(appointmentsRef, appointment);
+                const appointmentsRef = collection(db, `artifacts/${appId}/public/data/appointments`);
+                await addDoc(appointmentsRef, { ...appointment, createdBy: userId });
                 showNotification('Agendamento realizado com sucesso!');
             } catch (error) {
                 console.error("Erro ao salvar agendamento:", error);
@@ -497,9 +502,9 @@
         }
 
         async function updateAppointmentStatus(id, attended) {
-            if (!db || !userId) return;
+            if (!db) return;
             try {
-                const appointmentDoc = doc(db, `artifacts/${appId}/users/${userId}/appointments`, id);
+                const appointmentDoc = doc(db, `artifacts/${appId}/public/data/appointments`, id);
                 await setDoc(appointmentDoc, { attended }, { merge: true });
             } catch (error) {
                 console.error("Erro ao atualizar status do agendamento:", error);
@@ -507,9 +512,9 @@
         }
 
         async function deleteAppointment(id) {
-            if (!db || !userId) return;
+            if (!db) return;
             try {
-                const appointmentDoc = doc(db, `artifacts/${appId}/users/${userId}/appointments`, id);
+                const appointmentDoc = doc(db, `artifacts/${appId}/public/data/appointments`, id);
                 await deleteDoc(appointmentDoc);
                 showNotification('Agendamento excluído com sucesso!');
             } catch (error) {
@@ -548,19 +553,17 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white p-4 rounded-lg shadow border border-gray-200';
                 
-                let whatsappButton = `<a href="#" class="whatsapp-btn text-sm py-1.5 px-3 rounded-md shadow-md transition-colors" data-phone="${appointment.patientPhone}" data-name="${appointment.patientName}" data-date="${appointment.date}" data-time="${appointment.time}">
-                                Enviar WhatsApp
-                            </a>`;
-                let deleteButton = `<button class="text-red-500 hover:text-red-700 transition-colors delete-btn" data-id="${appointment.id}">
+                const showDeleteButton = userRole === 'admin' || (appointment.createdBy === userId);
+
+                const deleteButton = showDeleteButton ? `<button class="text-red-500 hover:text-red-700 transition-colors delete-btn" data-id="${appointment.id}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                   <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
                                 </svg>
-                            </button>`;
+                            </button>` : '';
                 
-                if (userRole === 'clinica') {
-                    whatsappButton = '';
-                    deleteButton = '';
-                }
+                const whatsappButton = `<a href="#" class="whatsapp-btn text-sm py-1.5 px-3 rounded-md shadow-md transition-colors" data-phone="${appointment.patientPhone}" data-name="${appointment.patientName}" data-date="${appointment.date}" data-time="${appointment.time}">
+                                Enviar WhatsApp
+                            </a>`;
 
                 card.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
@@ -569,6 +572,7 @@
                     </div>
                     <div class="text-sm text-gray-600 mb-2">
                         <p><strong>Observação:</strong> ${appointment.notes || 'N/A'}</p>
+                        <p class="text-xs text-gray-400 mt-1">Agendado por: ${userEmails[appointment.createdBy] || 'Desconhecido'}</p>
                         ${date === 'history' ? `<p><strong>Data:</strong> ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
                     </div>
                     <div class="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mt-4 space-y-2 sm:space-y-0">
@@ -614,7 +618,7 @@
         }
         
         async function printReport(date) {
-            const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
+            const appointmentsRef = collection(db, `artifacts/${appId}/public/data/appointments`);
             const q = query(appointmentsRef, where("date", "==", date));
             const querySnapshot = await getDocs(q);
             const appointments = [];
