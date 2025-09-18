@@ -235,7 +235,6 @@
           messagingSenderId: "729712538362",
           appId: "1:729712538362:web:101f5e01addac91a2a4f43"
         };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         // Inicialização do Firebase
         let app, db, auth, userId, userRole, allAppointments = [], allUsers = [];
@@ -278,11 +277,12 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
                 
-                // Monitora o estado de autenticação do usuário
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
-                        checkUserRole(userId);
+                        // O onSnapshot do perfil de usuário garante que a função será carregada
+                        // assim que o documento estiver disponível, evitando erros.
+                        setupUserRoleListener();
                     } else {
                         // Ninguém logado, mostra a tela de autenticação
                         authScreen.classList.remove('hidden');
@@ -317,7 +317,6 @@
             authError.classList.add('hidden');
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // A autenticação bem-sucedida é tratada pelo onAuthStateChanged
             } catch (error) {
                 console.error("Erro de login:", error);
                 authError.textContent = "E-mail ou senha incorretos.";
@@ -344,7 +343,8 @@
                     email: email,
                     role: role
                 });
-                showNotification(`Cadastro realizado. Você é o primeiro usuário, sua função é: ${role.toUpperCase()}.`);
+                // A função onAuthStateChanged irá lidar com o carregamento do sistema principal
+                // assim que o perfil do usuário for criado
             } catch (error) {
                 console.error("Erro de registro:", error);
                 authError.textContent = "Erro ao cadastrar. Tente novamente.";
@@ -363,22 +363,22 @@
         });
 
         // --- Permissões e Visualização ---
+        
+        function setupUserRoleListener() {
+            if (!db || !userId) return;
 
-        async function checkUserRole(uid) {
-            try {
-                const docRef = doc(db, "user_roles", uid);
-                const docSnap = await getDoc(docRef);
+            const userDocRef = doc(db, "user_roles", userId);
+            onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     userRole = docSnap.data().role;
                     displayMainSystem(userRole);
                 } else {
-                    console.error("Função do usuário não encontrada.");
-                    await signOut(auth);
+                    console.warn("Perfil do usuário não encontrado. Aguardando...");
                 }
-            } catch (error) {
-                console.error("Erro ao verificar a função do usuário:", error);
-                await signOut(auth);
-            }
+            }, (error) => {
+                console.error("Erro ao obter perfil do usuário em tempo real:", error);
+                signOut(auth);
+            });
         }
 
         function displayMainSystem(role) {
@@ -455,7 +455,7 @@
             });
         }
 
-        // --- Funcionalidades da Agenda (Sem Alterações) ---
+        // --- Funcionalidades da Agenda ---
 
         function setupAppointmentsListener() {
             if (!db || !userId) return;
