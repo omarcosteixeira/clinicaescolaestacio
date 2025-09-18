@@ -64,18 +64,41 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Tela de Login -->
-    <div id="login-screen" class="flex items-center justify-center min-h-screen bg-gray-100">
+    <!-- Tela de Login e Registro -->
+    <div id="auth-screen" class="flex items-center justify-center min-h-screen bg-gray-100">
         <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
-            <h2 class="text-2xl font-bold text-center mb-6 text-slate-800">Login</h2>
+            <h2 id="auth-title" class="text-2xl font-bold text-center mb-6 text-slate-800">Login</h2>
+            
+            <!-- Formulário de Login -->
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label for="login-code" class="block text-sm font-medium text-gray-700">Código de Acesso</label>
-                    <input type="text" id="login-code" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Digite o código de acesso">
+                    <label for="login-email" class="block text-sm font-medium text-gray-700">E-mail</label>
+                    <input type="email" id="login-email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Digite seu e-mail">
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input type="password" id="login-password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Digite sua senha">
                 </div>
                 <button type="submit" class="w-full bg-slate-700 text-white py-2 px-4 rounded-md shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 font-semibold transition-colors">Entrar</button>
-                <p id="login-error" class="text-red-500 text-center text-sm mt-4 hidden">Código de acesso incorreto.</p>
+                <p id="auth-error" class="text-red-500 text-center text-sm mt-4 hidden">E-mail ou senha incorretos.</p>
             </form>
+
+            <!-- Formulário de Registro (inicialmente oculto) -->
+            <form id="register-form" class="space-y-4 hidden">
+                <div>
+                    <label for="register-email" class="block text-sm font-medium text-gray-700">E-mail</label>
+                    <input type="email" id="register-email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Digite seu e-mail">
+                </div>
+                <div>
+                    <label for="register-password" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input type="password" id="register-password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Crie uma senha forte">
+                </div>
+                <button type="submit" class="w-full bg-slate-700 text-white py-2 px-4 rounded-md shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 font-semibold transition-colors">Cadastrar</button>
+            </form>
+
+            <div class="flex justify-center mt-4">
+                <button id="toggle-auth" class="text-sm text-indigo-600 hover:underline">Ainda não tem uma conta? Cadastre-se</button>
+            </div>
         </div>
     </div>
 
@@ -104,6 +127,14 @@
                 <!-- Botão de Sair -->
                 <button id="logout-btn" class="bg-red-500 text-white py-2 px-4 rounded-md shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 font-semibold transition-colors no-print">Sair</button>
             </header>
+            
+            <!-- Seção de Gerenciamento de Usuários (Visível apenas para Admin) -->
+            <div id="admin-section" class="mb-10 p-6 bg-yellow-50 rounded-lg shadow-inner no-print hidden">
+                <h2 class="text-xl font-semibold mb-4 text-slate-700">Gerenciamento de Usuários (Admin)</h2>
+                <div id="user-list" class="space-y-4">
+                    <p class="text-gray-500 text-center">Nenhum usuário cadastrado.</p>
+                </div>
+            </div>
 
             <!-- Seção de Agendamento (no-print) -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 no-print">
@@ -187,8 +218,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, onSnapshot, addDoc, setDoc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, setDoc, deleteDoc, query, where, getDocs, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Ativa o log de debug do Firestore
@@ -196,7 +227,6 @@
 
         // Variáveis globais de ambiente (fornecidas pelo sistema)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        // A sua configuração do Firebase foi inserida aqui!
         const firebaseConfig = {
           apiKey: "AIzaSyBdR4YZeJn9IpClqn4GAfaC-pXfNEzVg68",
           authDomain: "agenda-clinica-estacio.firebaseapp.com",
@@ -208,13 +238,21 @@
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         // Inicialização do Firebase
-        let app, db, auth, userId, userRole, allAppointments = [];
+        let app, db, auth, userId, userRole, allAppointments = [], allUsers = [];
         const userInfoElement = document.getElementById('user-info');
-        const loginScreen = document.getElementById('login-screen');
+        const authScreen = document.getElementById('auth-screen');
         const mainSystem = document.getElementById('main-system');
         let unsubscribeAppointments = null;
+        let unsubscribeUsers = null;
 
-        // Elementos do DOM
+        // Elementos do DOM - Autenticação
+        const authTitle = document.getElementById('auth-title');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const toggleAuthBtn = document.getElementById('toggle-auth');
+        const authError = document.getElementById('auth-error');
+
+        // Elementos do DOM - Sistema
         const scheduleForm = document.getElementById('schedule-form');
         const scheduleSection = document.getElementById('schedule-section');
         const filterDateInput = document.getElementById('filter-date');
@@ -229,44 +267,196 @@
         const confirmDeleteBtn = document.getElementById('confirm-delete');
         const cancelDeleteBtn = document.getElementById('cancel-delete');
         const logoutBtn = document.getElementById('logout-btn');
+        const adminSection = document.getElementById('admin-section');
+        const userListDiv = document.getElementById('user-list');
         let appointmentToDeleteId = null;
 
-        // IDs de usuário para cada função. **ATUALIZE ESTES VALORES** com os UIDs reais.
-        const ADMIN_UID = "9sThalmmzBOAJViUFe526TPu1Bv1"; // Substitua por um UID real do Firebase
-        const CLINIC_UID = "634Gmrpk1zPOP5b5m1wql0apu843"; // Substitua por um UID real do Firebase
-
-        // Códigos de acesso para simular o login
-        const ADMIN_LOGIN_CODE = "admin123";
-        const CLINIC_LOGIN_CODE = "clinica456";
-
-        // Função para verificar a função do usuário
-        function checkUserRole(uid) {
-            if (uid === ADMIN_UID) {
-                return 'admin';
-            } else if (uid === CLINIC_UID) {
-                return 'clinica';
-            }
-            return 'guest';
-        }
-
-        // Função de inicialização do Firebase e autenticação
-        async function initializeFirebase() {
+        // Função de inicialização do Firebase
+        function initializeFirebase() {
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
                 
-                // O sistema agora espera pelo login para iniciar
-                loginScreen.classList.remove('hidden');
+                // Monitora o estado de autenticação do usuário
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        checkUserRole(userId);
+                    } else {
+                        // Ninguém logado, mostra a tela de autenticação
+                        authScreen.classList.remove('hidden');
+                        mainSystem.classList.add('hidden');
+                        if (unsubscribeAppointments) unsubscribeAppointments();
+                        if (unsubscribeUsers) unsubscribeUsers();
+                    }
+                });
                 
             } catch (error) {
                 console.error("Erro ao inicializar Firebase:", error);
-                document.getElementById('login-error').textContent = "Erro de conexão. Tente novamente.";
-                document.getElementById('login-error').classList.remove('hidden');
+                authError.textContent = "Erro de conexão. Tente novamente.";
+                authError.classList.remove('hidden');
             }
         }
 
-        // Configura o listener do Firestore para agendamentos
+        // --- Autenticação ---
+        
+        toggleAuthBtn.addEventListener('click', () => {
+            loginForm.classList.toggle('hidden');
+            registerForm.classList.toggle('hidden');
+            const isLogin = loginForm.classList.contains('hidden');
+            authTitle.textContent = isLogin ? 'Cadastro' : 'Login';
+            toggleAuthBtn.textContent = isLogin ? 'Já tem uma conta? Faça login' : 'Ainda não tem uma conta? Cadastre-se';
+            authError.classList.add('hidden');
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            authError.classList.add('hidden');
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // A autenticação bem-sucedida é tratada pelo onAuthStateChanged
+            } catch (error) {
+                console.error("Erro de login:", error);
+                authError.textContent = "E-mail ou senha incorretos.";
+                authError.classList.remove('hidden');
+            }
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            authError.classList.add('hidden');
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
+
+                const usersRef = collection(db, 'user_roles');
+                const countQuery = query(usersRef);
+                const snapshot = await getCountFromServer(countQuery);
+                const userCount = snapshot.data().count;
+
+                const role = userCount === 0 ? 'admin' : 'clinica';
+                await setDoc(doc(db, "user_roles", uid), {
+                    email: email,
+                    role: role
+                });
+                showNotification(`Cadastro realizado. Você é o primeiro usuário, sua função é: ${role.toUpperCase()}.`);
+            } catch (error) {
+                console.error("Erro de registro:", error);
+                authError.textContent = "Erro ao cadastrar. Tente novamente.";
+                authError.classList.remove('hidden');
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showNotification('Sessão encerrada com sucesso.');
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                showNotification('Erro ao tentar sair.');
+            }
+        });
+
+        // --- Permissões e Visualização ---
+
+        async function checkUserRole(uid) {
+            try {
+                const docRef = doc(db, "user_roles", uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    userRole = docSnap.data().role;
+                    displayMainSystem(userRole);
+                } else {
+                    console.error("Função do usuário não encontrada.");
+                    await signOut(auth);
+                }
+            } catch (error) {
+                console.error("Erro ao verificar a função do usuário:", error);
+                await signOut(auth);
+            }
+        }
+
+        function displayMainSystem(role) {
+            authScreen.classList.add('hidden');
+            mainSystem.classList.remove('hidden');
+            userInfoElement.innerHTML = `E-mail: <span class="font-bold">${auth.currentUser.email}</span> <br> Função: <span class="font-bold">${role.toUpperCase()}</span>`;
+
+            if (role === 'admin') {
+                scheduleSection.classList.remove('hidden');
+                adminSection.classList.remove('hidden');
+                setupUsersListener();
+            } else {
+                scheduleSection.classList.add('hidden');
+                adminSection.classList.add('hidden');
+            }
+            
+            setupAppointmentsListener();
+            const today = new Date().toISOString().split('T')[0];
+            filterDateInput.value = today;
+            renderAppointments(today);
+        }
+
+        // --- Gerenciamento de Usuários (Admin) ---
+
+        function setupUsersListener() {
+            if (!db || userRole !== 'admin') return;
+            const usersRef = collection(db, "user_roles");
+            unsubscribeUsers = onSnapshot(usersRef, (querySnapshot) => {
+                allUsers = [];
+                querySnapshot.forEach((doc) => {
+                    allUsers.push({ id: doc.id, ...doc.data() });
+                });
+                renderUsers();
+            }, (error) => {
+                console.error("Erro ao obter usuários em tempo real:", error);
+            });
+        }
+        
+        function renderUsers() {
+            userListDiv.innerHTML = '';
+            if (allUsers.length === 0) {
+                userListDiv.innerHTML = '<p class="text-gray-500 text-center">Nenhum usuário cadastrado.</p>';
+                return;
+            }
+            allUsers.forEach(user => {
+                const userCard = document.createElement('div');
+                userCard.className = 'bg-white p-4 rounded-lg shadow border border-gray-200 flex justify-between items-center';
+                userCard.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-sm">${user.email}</p>
+                        <p class="text-xs text-gray-500">Função: ${user.role.toUpperCase()}</p>
+                    </div>
+                    <button data-uid="${user.id}" data-role="${user.role}" class="toggle-role-btn bg-blue-500 text-white text-xs px-3 py-1 rounded-md hover:bg-blue-600 transition-colors">
+                        ${user.role === 'admin' ? 'Tornar Clínica' : 'Tornar Admin'}
+                    </button>
+                `;
+                userListDiv.appendChild(userCard);
+            });
+
+            document.querySelectorAll('.toggle-role-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const uid = e.target.dataset.uid;
+                    const currentRole = e.target.dataset.role;
+                    const newRole = currentRole === 'admin' ? 'clinica' : 'admin';
+                    try {
+                        const userDocRef = doc(db, "user_roles", uid);
+                        await setDoc(userDocRef, { role: newRole }, { merge: true });
+                        showNotification(`Função do usuário alterada para ${newRole.toUpperCase()}.`);
+                    } catch (error) {
+                        console.error("Erro ao alterar função:", error);
+                        showNotification('Erro ao alterar a função do usuário.');
+                    }
+                });
+            });
+        }
+
+        // --- Funcionalidades da Agenda (Sem Alterações) ---
+
         function setupAppointmentsListener() {
             if (!db || !userId) return;
 
@@ -278,7 +468,6 @@
                 querySnapshot.forEach((doc) => {
                     allAppointments.push({ id: doc.id, ...doc.data() });
                 });
-                // Renderiza a visualização atual com os novos dados
                 if (filterDateInput.value) {
                     renderAppointments(filterDateInput.value);
                 }
@@ -287,7 +476,6 @@
             });
         }
 
-        // Função para mostrar uma notificação de sucesso
         function showNotification(message) {
             messageBox.textContent = message;
             messageBox.style.display = 'block';
@@ -296,7 +484,6 @@
             }, 3000);
         }
 
-        // Função para salvar um agendamento no Firestore
         async function saveAppointment(appointment) {
             if (!db || !userId) return;
             try {
@@ -309,7 +496,6 @@
             }
         }
 
-        // Função para atualizar o status do agendamento no Firestore
         async function updateAppointmentStatus(id, attended) {
             if (!db || !userId) return;
             try {
@@ -320,7 +506,6 @@
             }
         }
 
-        // Função para deletar um agendamento
         async function deleteAppointment(id) {
             if (!db || !userId) return;
             try {
@@ -333,7 +518,6 @@
             }
         }
         
-        // Função para renderizar a lista de agendamentos
         function renderAppointments(date) {
             let appointmentsToRender = [];
             if (date === 'history') {
@@ -353,7 +537,7 @@
                 printHistoryBtn.classList.add('hidden');
             }
 
-            appointmentList.innerHTML = ''; // Limpa a lista
+            appointmentList.innerHTML = '';
             
             if (appointmentsToRender.length === 0) {
                 appointmentList.innerHTML = '<p class="text-gray-500 text-center">Nenhum agendamento para esta data.</p>';
@@ -373,7 +557,6 @@
                                 </svg>
                             </button>`;
                 
-                // Esconde botões para o usuário 'clinica'
                 if (userRole === 'clinica') {
                     whatsappButton = '';
                     deleteButton = '';
@@ -402,7 +585,6 @@
                 appointmentList.appendChild(card);
             });
 
-            // Adiciona listeners para os checkboxes
             document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
                 checkbox.addEventListener('change', (event) => {
                     const id = event.target.id.split('-')[1];
@@ -410,7 +592,6 @@
                 });
             });
 
-            // Adiciona listeners para os botões de exclusão
             document.querySelectorAll('.delete-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
                     appointmentToDeleteId = event.currentTarget.dataset.id;
@@ -418,7 +599,6 @@
                 });
             });
 
-            // Adiciona listeners para os botões do WhatsApp
             document.querySelectorAll('.whatsapp-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
                     const phone = event.target.dataset.phone;
@@ -433,7 +613,6 @@
             });
         }
         
-        // Função para gerar o relatório para impressão/PDF
         async function printReport(date) {
             const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
             const q = query(appointmentsRef, where("date", "==", date));
@@ -465,11 +644,9 @@
                 });
             }
             
-            // Ativa o estilo de impressão
             window.print();
         }
 
-        // Função para gerar o relatório completo de agendamentos para impressão
         function printFullReport() {
             const printList = document.getElementById('print-list');
             printList.innerHTML = '';
@@ -497,31 +674,25 @@
             window.print();
         }
 
-        // Adiciona um listener para o botão "Ver Hoje"
         todayBtn.addEventListener('click', () => {
             const today = new Date().toISOString().split('T')[0];
             filterDateInput.value = today;
             renderAppointments(today);
         });
 
-        // Adiciona um listener para o botão "Ver Histórico"
         historyBtn.addEventListener('click', () => {
             renderAppointments('history');
         });
 
-        // Adiciona um listener para o botão de impressão diária
         printDailyBtn.addEventListener('click', () => {
             const date = filterDateInput.value || new Date().toISOString().split('T')[0];
             printReport(date);
         });
 
-        // Adiciona um listener para o botão de impressão do histórico
         printHistoryBtn.addEventListener('click', () => {
             printFullReport();
         });
 
-
-        // Adiciona um listener para o evento de submissão do formulário
         scheduleForm.addEventListener('submit', (event) => {
             event.preventDefault();
             
@@ -531,7 +702,6 @@
             const time = document.getElementById('appointment-time').value;
             const notes = document.getElementById('appointment-notes').value;
 
-            // Cria um objeto de agendamento
             const appointment = {
                 date,
                 patientName,
@@ -545,12 +715,10 @@
             scheduleForm.reset();
         });
 
-        // Adiciona um listener para o evento de mudança na data de filtro
         filterDateInput.addEventListener('change', (event) => {
             renderAppointments(event.target.value);
         });
         
-        // Listener para o botão de confirmação de exclusão
         confirmDeleteBtn.addEventListener('click', () => {
             if (appointmentToDeleteId) {
                 deleteAppointment(appointmentToDeleteId);
@@ -559,80 +727,10 @@
             confirmationModal.classList.add('hidden');
         });
 
-        // Listener para o botão de cancelar exclusão
         cancelDeleteBtn.addEventListener('click', () => {
             confirmationModal.classList.add('hidden');
         });
 
-        // Adiciona um listener para o formulário de login
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const loginCode = document.getElementById('login-code').value;
-            const loginError = document.getElementById('login-error');
-            loginError.classList.add('hidden');
-
-            let customToken = initialAuthToken; // Usa o token padrão, ou um token específico para o ambiente.
-
-            if (loginCode === ADMIN_LOGIN_CODE) {
-                userRole = 'admin';
-            } else if (loginCode === CLINIC_LOGIN_CODE) {
-                userRole = 'clinica';
-            } else {
-                loginError.classList.remove('hidden');
-                return;
-            }
-
-            try {
-                // Autenticação com o token padrão, pois o controle de acesso é feito pelo "código de acesso"
-                // O token inicial é fornecido automaticamente pelo ambiente
-                if (customToken) {
-                    const userCredential = await signInWithCustomToken(auth, customToken);
-                    userId = userCredential.user.uid;
-                    loginScreen.classList.add('hidden');
-                    mainSystem.classList.remove('hidden');
-                    
-                    if (userRole === 'clinica') {
-                        scheduleSection.classList.add('hidden');
-                    } else {
-                        scheduleSection.classList.remove('hidden');
-                    }
-                    
-                    userInfoElement.innerHTML = `Usuário ID: <span class="font-bold">${userId}</span> <br> Função: <span class="font-bold">${userRole.toUpperCase()}</span>`;
-                    setupAppointmentsListener();
-                    
-                    const today = new Date().toISOString().split('T')[0];
-                    filterDateInput.value = today;
-                    renderAppointments(today);
-                } else {
-                     loginError.textContent = "Erro de autenticação. Token inicial não encontrado.";
-                     loginError.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error("Erro de login:", error);
-                loginError.textContent = "Erro ao fazer login. Tente novamente.";
-                loginError.classList.remove('hidden');
-            }
-        });
-
-        // Adiciona um listener para o botão de sair
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                mainSystem.classList.add('hidden');
-                loginScreen.classList.remove('hidden');
-                document.getElementById('login-code').value = '';
-                userInfoElement.textContent = "Carregando...";
-                if (unsubscribeAppointments) {
-                    unsubscribeAppointments(); // Desconecta o listener do Firestore
-                }
-                showNotification('Sessão encerrada com sucesso.');
-            } catch (error) {
-                console.error("Erro ao sair:", error);
-                showNotification('Erro ao tentar sair.');
-            }
-        });
-
-        // Inicializa a aplicação ao carregar a página
         window.addEventListener('load', () => {
             initializeFirebase();
         });
