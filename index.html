@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGENDA CLÍNICA ESCOLA ESTÁCIO</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .whatsapp-btn {
+            background-color: #25d366;
+            color: white;
+        }
+        .whatsapp-btn:hover {
+            background-color: #128c7e;
+        }
+        @media print {
+            body {
+                background-color: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .container {
+                padding: 0;
+                margin: 0;
+            }
+            h1 {
+                font-size: 1.5rem;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid #ccc;
+                padding: 8px;
+                text-align: left;
+            }
+            .print-header {
+                display: block;
+                text-align: center;
+                font-size: 1.25rem;
+                margin-bottom: 1rem;
+            }
+        }
+        .message-box {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Tela de Login -->
+    <div id="login-screen" class="flex items-center justify-center min-h-screen bg-gray-100">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center mb-6 text-slate-800">Login</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-code" class="block text-sm font-medium text-gray-700">Código de Acesso</label>
+                    <input type="text" id="login-code" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Digite o código de acesso">
+                </div>
+                <button type="submit" class="w-full bg-slate-700 text-white py-2 px-4 rounded-md shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 font-semibold transition-colors">Entrar</button>
+                <p id="login-error" class="text-red-500 text-center text-sm mt-4 hidden">Código de acesso incorreto.</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Conteúdo principal do sistema (inicialmente oculto) -->
+    <div id="main-system" class="hidden">
+        <!-- Modal de Confirmação de Exclusão -->
+        <div id="confirmation-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <h3 class="text-lg font-bold text-center mb-4">Confirmar Exclusão</h3>
+                <p class="text-center text-gray-700">Tem certeza que deseja excluir este agendamento?</p>
+                <div class="flex justify-center mt-6 space-x-4">
+                    <button id="cancel-delete" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400">Cancelar</button>
+                    <button id="confirm-delete" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">Excluir</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container mx-auto max-w-7xl bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <!-- Título do Sistema -->
+            <header class="text-center mb-8 flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-800">AGENDA CLÍNICA ESCOLA ESTÁCIO</h1>
+                    <p class="text-slate-500 mt-2">Sistema de agendamento de consultas de nutrição</p>
+                    <p id="user-info" class="text-sm mt-4 text-gray-400">Carregando...</p>
+                </div>
+                <!-- Botão de Sair -->
+                <button id="logout-btn" class="bg-red-500 text-white py-2 px-4 rounded-md shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 font-semibold transition-colors no-print">Sair</button>
+            </header>
+
+            <!-- Seção de Agendamento (no-print) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 no-print">
+                <!-- Formulário de Agendamento -->
+                <div id="schedule-section" class="bg-gray-50 p-6 rounded-lg shadow-inner">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-700">Agendar Novo Atendimento</h2>
+                    <form id="schedule-form" class="space-y-4">
+                        <div>
+                            <label for="appointment-date" class="block text-sm font-medium text-gray-700">Data</label>
+                            <input type="date" id="appointment-date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="patient-name" class="block text-sm font-medium text-gray-700">Nome do Paciente</label>
+                            <input type="text" id="patient-name" placeholder="Ex: Maria da Silva" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="patient-phone" class="block text-sm font-medium text-gray-700">Telefone do Paciente (WhatsApp)</label>
+                            <input type="tel" id="patient-phone" placeholder="Ex: 5521999999999" pattern="[0-9]{13}" title="Ex: 5521999999999" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="appointment-time" class="block text-sm font-medium text-gray-700">Horário</label>
+                            <input type="time" id="appointment-time" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="appointment-notes" class="block text-sm font-medium text-gray-700">Observação</label>
+                            <textarea id="appointment-notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Motivo da consulta, observações, etc."></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-slate-700 text-white py-2 px-4 rounded-md shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 font-semibold transition-colors">Agendar</button>
+                    </form>
+                </div>
+
+                <!-- Visualização Diária e Relatórios -->
+                <div class="bg-gray-50 p-6 rounded-lg shadow-inner">
+                    <h2 id="agenda-title" class="text-xl font-semibold mb-4 text-slate-700">Agenda do Dia</h2>
+                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
+                        <label for="filter-date" class="text-sm font-medium text-gray-700">Filtrar por data:</label>
+                        <input type="date" id="filter-date" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <button id="today-btn" class="bg-indigo-500 text-white text-sm py-2 px-4 rounded-md shadow-md hover:bg-indigo-600 font-semibold transition-colors">Ver Hoje</button>
+                        <button id="history-btn" class="bg-green-600 text-white text-sm py-2 px-4 rounded-md shadow-md hover:bg-green-700 font-semibold transition-colors">Ver Histórico</button>
+                    </div>
+                    <div class="flex space-x-2 mb-4">
+                        <button id="print-daily-btn" class="bg-blue-500 text-white text-sm py-2 px-4 rounded-md shadow-md hover:bg-blue-600 font-semibold transition-colors">Imprimir Relatório Diário</button>
+                        <button id="print-history-btn" class="bg-cyan-500 text-white text-sm py-2 px-4 rounded-md shadow-md hover:bg-cyan-600 font-semibold transition-colors hidden">Imprimir Histórico</button>
+                    </div>
+                    <div id="appointment-list" class="space-y-4">
+                        <p class="text-gray-500 text-center">Nenhum agendamento para esta data.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção do Relatório (oculto por padrão) -->
+            <div id="print-section" class="hidden">
+                <h1 class="print-header font-bold text-2xl">Relatório de Agendamento</h1>
+                <p class="text-center text-sm mb-4">Data: <span id="print-date"></span></p>
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="py-2 px-4 text-left font-semibold">Horário</th>
+                            <th class="py-2 px-4 text-left font-semibold">Paciente</th>
+                            <th class="py-2 px-4 text-left font-semibold">Observação</th>
+                            <th class="py-2 px-4 text-left font-semibold">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="print-list">
+                        <!-- Conteúdo gerado via JS para impressão -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Rodapé -->
+        <footer class="mt-8 text-center text-sm text-gray-500">
+            <p>SISTEMA CRIADO POR MARCOS RODRIGO TEIXEIRA</p>
+        </footer>
+    </div>
+
+    <!-- Caixa de Mensagem (no-print) -->
+    <div id="message-box" class="message-box p-4 bg-green-500 text-white rounded-lg shadow-lg hidden">
+        <p>Agendamento realizado com sucesso!</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, setDoc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Ativa o log de debug do Firestore
+        setLogLevel('debug');
+
+        // Variáveis globais de ambiente (fornecidas pelo sistema)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // A sua configuração do Firebase foi inserida aqui!
+        const firebaseConfig = {
+          apiKey: "AIzaSyBdR4YZeJn9IpClqn4GAfaC-pXfNEzVg68",
+          authDomain: "agenda-clinica-estacio.firebaseapp.com",
+          projectId: "agenda-clinica-estacio",
+          storageBucket: "agenda-clinica-estacio.firebasestorage.app",
+          messagingSenderId: "729712538362",
+          appId: "1:729712538362:web:101f5e01addac91a2a4f43"
+        };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Inicialização do Firebase
+        let app, db, auth, userId, userRole, allAppointments = [];
+        const userInfoElement = document.getElementById('user-info');
+        const loginScreen = document.getElementById('login-screen');
+        const mainSystem = document.getElementById('main-system');
+        let unsubscribeAppointments = null;
+
+        // Elementos do DOM
+        const scheduleForm = document.getElementById('schedule-form');
+        const scheduleSection = document.getElementById('schedule-section');
+        const filterDateInput = document.getElementById('filter-date');
+        const todayBtn = document.getElementById('today-btn');
+        const historyBtn = document.getElementById('history-btn');
+        const printDailyBtn = document.getElementById('print-daily-btn');
+        const printHistoryBtn = document.getElementById('print-history-btn');
+        const appointmentList = document.getElementById('appointment-list');
+        const agendaTitle = document.getElementById('agenda-title');
+        const messageBox = document.getElementById('message-box');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+        const logoutBtn = document.getElementById('logout-btn');
+        let appointmentToDeleteId = null;
+
+        // IDs de usuário para cada função. **ATUALIZE ESTES VALORES** com os UIDs reais.
+        const ADMIN_UID = "admin_uid_aqui"; // Substitua por um UID real do Firebase
+        const CLINIC_UID = "clinica_uid_aqui"; // Substitua por um UID real do Firebase
+
+        // Códigos de acesso para simular o login
+        const ADMIN_LOGIN_CODE = "admin123";
+        const CLINIC_LOGIN_CODE = "clinica456";
+
+        // Função para verificar a função do usuário
+        function checkUserRole(uid) {
+            if (uid === ADMIN_UID) {
+                return 'admin';
+            } else if (uid === CLINIC_UID) {
+                return 'clinica';
+            }
+            return 'guest';
+        }
+
+        // Função de inicialização do Firebase e autenticação
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                // O sistema agora espera pelo login para iniciar
+                loginScreen.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error("Erro ao inicializar Firebase:", error);
+                document.getElementById('login-error').textContent = "Erro de conexão. Tente novamente.";
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        // Configura o listener do Firestore para agendamentos
+        function setupAppointmentsListener() {
+            if (!db || !userId) return;
+
+            const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
+            const q = query(appointmentsRef);
+
+            unsubscribeAppointments = onSnapshot(q, (querySnapshot) => {
+                allAppointments = [];
+                querySnapshot.forEach((doc) => {
+                    allAppointments.push({ id: doc.id, ...doc.data() });
+                });
+                // Renderiza a visualização atual com os novos dados
+                if (filterDateInput.value) {
+                    renderAppointments(filterDateInput.value);
+                }
+            }, (error) => {
+                console.error("Erro ao obter agendamentos em tempo real: ", error);
+            });
+        }
+
+        // Função para mostrar uma notificação de sucesso
+        function showNotification(message) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        // Função para salvar um agendamento no Firestore
+        async function saveAppointment(appointment) {
+            if (!db || !userId) return;
+            try {
+                const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
+                await addDoc(appointmentsRef, appointment);
+                showNotification('Agendamento realizado com sucesso!');
+            } catch (error) {
+                console.error("Erro ao salvar agendamento:", error);
+                showNotification('Erro ao salvar agendamento.');
+            }
+        }
+
+        // Função para atualizar o status do agendamento no Firestore
+        async function updateAppointmentStatus(id, attended) {
+            if (!db || !userId) return;
+            try {
+                const appointmentDoc = doc(db, `artifacts/${appId}/users/${userId}/appointments`, id);
+                await setDoc(appointmentDoc, { attended }, { merge: true });
+            } catch (error) {
+                console.error("Erro ao atualizar status do agendamento:", error);
+            }
+        }
+
+        // Função para deletar um agendamento
+        async function deleteAppointment(id) {
+            if (!db || !userId) return;
+            try {
+                const appointmentDoc = doc(db, `artifacts/${appId}/users/${userId}/appointments`, id);
+                await deleteDoc(appointmentDoc);
+                showNotification('Agendamento excluído com sucesso!');
+            } catch (error) {
+                console.error("Erro ao excluir agendamento:", error);
+                showNotification('Erro ao excluir agendamento.');
+            }
+        }
+        
+        // Função para renderizar a lista de agendamentos
+        function renderAppointments(date) {
+            let appointmentsToRender = [];
+            if (date === 'history') {
+                appointmentsToRender = [...allAppointments].sort((a, b) => {
+                    const dateA = a.date + 'T' + a.time;
+                    const dateB = b.date + 'T' + b.time;
+                    return new Date(dateA) - new Date(dateB);
+                });
+                agendaTitle.textContent = 'Histórico de Agendamentos';
+                printDailyBtn.classList.add('hidden');
+                printHistoryBtn.classList.remove('hidden');
+                filterDateInput.value = '';
+            } else {
+                appointmentsToRender = allAppointments.filter(app => app.date === date).sort((a, b) => (a.time > b.time) ? 1 : -1);
+                agendaTitle.textContent = 'Agenda do Dia';
+                printDailyBtn.classList.remove('hidden');
+                printHistoryBtn.classList.add('hidden');
+            }
+
+            appointmentList.innerHTML = ''; // Limpa a lista
+            
+            if (appointmentsToRender.length === 0) {
+                appointmentList.innerHTML = '<p class="text-gray-500 text-center">Nenhum agendamento para esta data.</p>';
+                return;
+            }
+
+            appointmentsToRender.forEach(appointment => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-lg shadow border border-gray-200';
+                
+                let whatsappButton = `<a href="#" class="whatsapp-btn text-sm py-1.5 px-3 rounded-md shadow-md transition-colors" data-phone="${appointment.patientPhone}" data-name="${appointment.patientName}" data-date="${appointment.date}" data-time="${appointment.time}">
+                                Enviar WhatsApp
+                            </a>`;
+                let deleteButton = `<button class="text-red-500 hover:text-red-700 transition-colors delete-btn" data-id="${appointment.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                                </svg>
+                            </button>`;
+                
+                // Esconde botões para o usuário 'clinica'
+                if (userRole === 'clinica') {
+                    whatsappButton = '';
+                    deleteButton = '';
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-semibold text-slate-800">${appointment.patientName}</h3>
+                        <span class="text-sm font-medium text-slate-600">${appointment.time}</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-2">
+                        <p><strong>Observação:</strong> ${appointment.notes || 'N/A'}</p>
+                        ${date === 'history' ? `<p><strong>Data:</strong> ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mt-4 space-y-2 sm:space-y-0">
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="attended-${appointment.id}" ${appointment.attended ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                            <label for="attended-${appointment.id}" class="text-sm text-gray-700 select-none cursor-pointer">Paciente compareceu?</label>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                             ${whatsappButton}
+                             ${deleteButton}
+                        </div>
+                    </div>
+                `;
+                appointmentList.appendChild(card);
+            });
+
+            // Adiciona listeners para os checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (event) => {
+                    const id = event.target.id.split('-')[1];
+                    updateAppointmentStatus(id, event.target.checked);
+                });
+            });
+
+            // Adiciona listeners para os botões de exclusão
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    appointmentToDeleteId = event.currentTarget.dataset.id;
+                    confirmationModal.classList.remove('hidden');
+                });
+            });
+
+            // Adiciona listeners para os botões do WhatsApp
+            document.querySelectorAll('.whatsapp-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const phone = event.target.dataset.phone;
+                    const name = event.target.dataset.name;
+                    const date = new Date(event.target.dataset.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const time = event.target.dataset.time;
+                    const clinicName = "Clínica Escola Estácio";
+                    const message = `Olá, ${name}! Sua consulta na ${clinicName} foi agendada para o dia ${date} às ${time}. Agradecemos a preferência!`;
+                    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+                    window.open(whatsappUrl, '_blank');
+                });
+            });
+        }
+        
+        // Função para gerar o relatório para impressão/PDF
+        async function printReport(date) {
+            const appointmentsRef = collection(db, `artifacts/${appId}/users/${userId}/appointments`);
+            const q = query(appointmentsRef, where("date", "==", date));
+            const querySnapshot = await getDocs(q);
+            const appointments = [];
+            querySnapshot.forEach(doc => {
+                appointments.push(doc.data());
+            });
+
+            const filteredAppointments = appointments.sort((a, b) => (a.time > b.time) ? 1 : -1);
+            
+            const printList = document.getElementById('print-list');
+            printList.innerHTML = '';
+            
+            document.getElementById('print-date').textContent = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
+
+            if (filteredAppointments.length === 0) {
+                printList.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Nenhum agendamento para esta data.</td></tr>`;
+            } else {
+                filteredAppointments.forEach(app => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="py-2 px-4">${app.time}</td>
+                        <td class="py-2 px-4">${app.patientName}</td>
+                        <td class="py-2 px-4">${app.notes || 'N/A'}</td>
+                        <td class="py-2 px-4">${app.attended ? 'Compareceu' : 'Não Compareceu'}</td>
+                    `;
+                    printList.appendChild(row);
+                });
+            }
+            
+            // Ativa o estilo de impressão
+            window.print();
+        }
+
+        // Função para gerar o relatório completo de agendamentos para impressão
+        function printFullReport() {
+            const printList = document.getElementById('print-list');
+            printList.innerHTML = '';
+
+            document.getElementById('print-date').textContent = "Completo";
+
+            if (allAppointments.length === 0) {
+                printList.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Nenhum agendamento no histórico.</td></tr>`;
+            } else {
+                 [...allAppointments].sort((a, b) => {
+                    const dateA = a.date + 'T' + a.time;
+                    const dateB = b.date + 'T' + b.time;
+                    return new Date(dateA) - new Date(dateB);
+                }).forEach(app => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="py-2 px-4">${app.time}</td>
+                        <td class="py-2 px-4">${app.patientName}</td>
+                        <td class="py-2 px-4">${app.notes || 'N/A'}</td>
+                        <td class="py-2 px-4">${app.attended ? 'Compareceu' : 'Não Compareceu'}</td>
+                    `;
+                    printList.appendChild(row);
+                });
+            }
+            window.print();
+        }
+
+        // Adiciona um listener para o botão "Ver Hoje"
+        todayBtn.addEventListener('click', () => {
+            const today = new Date().toISOString().split('T')[0];
+            filterDateInput.value = today;
+            renderAppointments(today);
+        });
+
+        // Adiciona um listener para o botão "Ver Histórico"
+        historyBtn.addEventListener('click', () => {
+            renderAppointments('history');
+        });
+
+        // Adiciona um listener para o botão de impressão diária
+        printDailyBtn.addEventListener('click', () => {
+            const date = filterDateInput.value || new Date().toISOString().split('T')[0];
+            printReport(date);
+        });
+
+        // Adiciona um listener para o botão de impressão do histórico
+        printHistoryBtn.addEventListener('click', () => {
+            printFullReport();
+        });
+
+
+        // Adiciona um listener para o evento de submissão do formulário
+        scheduleForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            
+            const date = document.getElementById('appointment-date').value;
+            const patientName = document.getElementById('patient-name').value;
+            const patientPhone = document.getElementById('patient-phone').value;
+            const time = document.getElementById('appointment-time').value;
+            const notes = document.getElementById('appointment-notes').value;
+
+            // Cria um objeto de agendamento
+            const appointment = {
+                date,
+                patientName,
+                patientPhone,
+                time,
+                notes,
+                attended: false
+            };
+
+            saveAppointment(appointment);
+            scheduleForm.reset();
+        });
+
+        // Adiciona um listener para o evento de mudança na data de filtro
+        filterDateInput.addEventListener('change', (event) => {
+            renderAppointments(event.target.value);
+        });
+        
+        // Listener para o botão de confirmação de exclusão
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (appointmentToDeleteId) {
+                deleteAppointment(appointmentToDeleteId);
+                appointmentToDeleteId = null;
+            }
+            confirmationModal.classList.add('hidden');
+        });
+
+        // Listener para o botão de cancelar exclusão
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmationModal.classList.add('hidden');
+        });
+
+        // Adiciona um listener para o formulário de login
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loginCode = document.getElementById('login-code').value;
+            const loginError = document.getElementById('login-error');
+            loginError.classList.add('hidden');
+
+            let customToken = initialAuthToken; // Usa o token padrão, ou um token específico para o ambiente.
+
+            if (loginCode === ADMIN_LOGIN_CODE) {
+                userRole = 'admin';
+            } else if (loginCode === CLINIC_LOGIN_CODE) {
+                userRole = 'clinica';
+            } else {
+                loginError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                // Autenticação com o token padrão, pois o controle de acesso é feito pelo "código de acesso"
+                // O token inicial é fornecido automaticamente pelo ambiente
+                if (customToken) {
+                    const userCredential = await signInWithCustomToken(auth, customToken);
+                    userId = userCredential.user.uid;
+                    loginScreen.classList.add('hidden');
+                    mainSystem.classList.remove('hidden');
+                    
+                    if (userRole === 'clinica') {
+                        scheduleSection.classList.add('hidden');
+                    } else {
+                        scheduleSection.classList.remove('hidden');
+                    }
+                    
+                    userInfoElement.innerHTML = `Usuário ID: <span class="font-bold">${userId}</span> <br> Função: <span class="font-bold">${userRole.toUpperCase()}</span>`;
+                    setupAppointmentsListener();
+                    
+                    const today = new Date().toISOString().split('T')[0];
+                    filterDateInput.value = today;
+                    renderAppointments(today);
+                } else {
+                     loginError.textContent = "Erro de autenticação. Token inicial não encontrado.";
+                     loginError.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Erro de login:", error);
+                loginError.textContent = "Erro ao fazer login. Tente novamente.";
+                loginError.classList.remove('hidden');
+            }
+        });
+
+        // Adiciona um listener para o botão de sair
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                mainSystem.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
+                document.getElementById('login-code').value = '';
+                userInfoElement.textContent = "Carregando...";
+                if (unsubscribeAppointments) {
+                    unsubscribeAppointments(); // Desconecta o listener do Firestore
+                }
+                showNotification('Sessão encerrada com sucesso.');
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                showNotification('Erro ao tentar sair.');
+            }
+        });
+
+        // Inicializa a aplicação ao carregar a página
+        window.addEventListener('load', () => {
+            initializeFirebase();
+        });
+    </script>
+</body>
+</html>
