@@ -554,16 +554,24 @@
                 card.className = 'bg-white p-4 rounded-lg shadow border border-gray-200';
                 
                 const showDeleteButton = userRole === 'admin' || (appointment.createdBy === userId);
-
-                const deleteButton = showDeleteButton ? `<button class="text-red-500 hover:text-red-700 transition-colors delete-btn" data-id="${appointment.id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
-                                </svg>
-                            </button>` : '';
+                const deleteButton = showDeleteButton ? `
+                    <button class="text-red-500 hover:text-red-700 transition-colors delete-btn" data-id="${appointment.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>` : '';
                 
-                const whatsappButton = `<a href="#" class="whatsapp-btn text-sm py-1.5 px-3 rounded-md shadow-md transition-colors" data-phone="${appointment.patientPhone}" data-name="${appointment.patientName}" data-date="${appointment.date}" data-time="${appointment.time}">
-                                Enviar WhatsApp
-                            </a>`;
+                const whatsappButton = (userRole === 'admin') ? `
+                    <a href="#" class="whatsapp-btn text-sm py-1.5 px-3 rounded-md shadow-md transition-colors" data-phone="${appointment.patientPhone}" data-name="${appointment.patientName}" data-date="${appointment.date}" data-time="${appointment.time}">
+                        Enviar WhatsApp
+                    </a>` : '';
+
+                const statusButtons = `
+                    <div class="flex space-x-2">
+                        <button class="status-btn px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${appointment.attended ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-800 hover:bg-green-300'}" data-id="${appointment.id}" data-status="true">Compareceu</button>
+                        <button class="status-btn px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${!appointment.attended ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-800 hover:bg-red-300'}" data-id="${appointment.id}" data-status="false">Não Compareceu</button>
+                    </div>
+                `;
 
                 card.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
@@ -576,10 +584,7 @@
                         ${date === 'history' ? `<p><strong>Data:</strong> ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
                     </div>
                     <div class="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mt-4 space-y-2 sm:space-y-0">
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="attended-${appointment.id}" ${appointment.attended ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                            <label for="attended-${appointment.id}" class="text-sm text-gray-700 select-none cursor-pointer">Paciente compareceu?</label>
-                        </div>
+                        ${statusButtons}
                         <div class="flex items-center space-x-2">
                              ${whatsappButton}
                              ${deleteButton}
@@ -588,11 +593,13 @@
                 `;
                 appointmentList.appendChild(card);
             });
-
-            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-                checkbox.addEventListener('change', (event) => {
-                    const id = event.target.id.split('-')[1];
-                    updateAppointmentStatus(id, event.target.checked);
+            
+            // Adiciona listeners para os novos botões de status
+            document.querySelectorAll('.status-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const id = event.target.dataset.id;
+                    const status = event.target.dataset.status === 'true';
+                    updateAppointmentStatus(id, status);
                 });
             });
 
